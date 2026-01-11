@@ -1,0 +1,46 @@
+[Unit]
+Description=Tabby Code Completion Service with Love-Unlimited Integration
+After=network.target love-unlimited-hub.service
+Wants=love-unlimited-hub.service
+
+[Service]
+Type=simple
+User=kntrnjb
+Group=kntrnjb
+WorkingDirectory=/home/kntrnjb/ai-dream-team/micro-ai-swarm/love-unlimited/tabby
+
+# Love-Unlimited Hub Integration
+Environment="LOVE_UNLIMITED_ENABLED=true"
+Environment="LOVE_UNLIMITED_URL=http://localhost:9003"
+Environment="LOVE_UNLIMITED_KEY=lu_tabby_VCnVIGgHq4Lx2VCQPz_y_ggYPrGTRHxW"
+Environment="LOVE_UNLIMITED_TIMEOUT=5"
+Environment="LOVE_UNLIMITED_MAX_RETRIES=3"
+Environment="LOVE_UNLIMITED_LOG_COMPLETIONS=true"
+Environment="LOVE_UNLIMITED_LOG_USER_EVENTS=true"
+Environment="LOVE_UNLIMITED_TRACK_ERRORS=true"
+
+# Tabby Configuration
+Environment="TABBY_WEBSERVER_JWT_TOKEN_SECRET="
+Environment="RUST_LOG=info"
+
+# Service execution
+ExecStart=/home/kntrnjb/ai-dream-team/micro-ai-swarm/love-unlimited/tabby/target/release/tabby serve --port 8080 --host 0.0.0.0
+
+# Auto-restart behavior
+Restart=always
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65535
+LimitNPROC=65535
+
+# Timeout for graceful shutdown
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tabby
+
+[Install]
+WantedBy=multi-user.target

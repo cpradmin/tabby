@@ -5,7 +5,7 @@ use clap::Args;
 use hyper::StatusCode;
 use spinners::{Spinner, Spinners, Stream};
 use tabby_common::{
-    api::{self, code::CodeSearch, event::EventLogger},
+    api::{self, code::CodeSearch, event::{EventLogger, ComposedLogger}},
     axum::AllowedCodeRepository,
     config::{Config, ModelConfig},
     usage,
@@ -31,6 +31,7 @@ use crate::{
         embedding,
         event::create_event_logger,
         health,
+        love_unlimited::{HubClient, HubConfig, MemoryBridge, HubEventLogger},
         model::download_model_if_needed,
         tantivy::IndexReaderProvider,
     },
@@ -140,7 +141,32 @@ pub async fn main(config: &Config, args: &ServeArgs) {
         None
     };
 
-    let mut logger: Arc<dyn EventLogger> = Arc::new(create_event_logger());
+    let base_logger = create_event_logger();
+    let mut logger: Arc<dyn EventLogger> = Arc::new(base_logger);
+
+    // Initialize Love-Unlimited Hub integration
+    let hub_config = HubConfig::from_env();
+    if hub_config.enabled {
+        match HubClient::new(hub_config.clone()) {
+            Ok(hub_client) => {
+                let memory_bridge = MemoryBridge::new(hub_client);
+                let hub_logger = HubEventLogger::new(memory_bridge);
+
+                // Check hub health
+                if hub_logger.health_check().await {
+                    // Create a composed logger with both file and hub logging
+                    let file_logger = create_event_logger();
+                    logger = Arc::new(ComposedLogger::new(file_logger, hub_logger));
+                    debug!("Love-Unlimited Hub integration enabled");
+                } else {
+                    warn!("Love-Unlimited Hub is not responding, running without memory integration");
+                }
+            }
+            Err(e) => {
+                warn!("Failed to initialize Love-Unlimited Hub client: {}", e);
+            }
+        }
+    }
 
     #[cfg(feature = "ee")]
     if let Some(ws) = &ws {
